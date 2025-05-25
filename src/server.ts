@@ -10,6 +10,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import expressStaticGzip from 'express-static-gzip';
 import { join } from 'node:path';
+import crypto from 'crypto';
+import { RequestContext } from './request-context';
+import { Transform } from 'node:stream';
+import { transformIndexHtml } from './server/transform-index';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
@@ -17,27 +22,36 @@ const app = express();
 const angularApp = new AngularNodeAppEngine();
 
 /**
- * Rate limiter for dynamic (non-static) requests
- * Applies to requests AFTER static assets are served
- */
-const dynamicLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: false,
-  legacyHeaders: false
-});
-
-/**
  * Security Related Headers
  */
-app.use(helmet({
-frameguard: {
-  action: 'deny'
-},
-hidePoweredBy: true,
-
-}))
+// Generate a NONCE and correctly set it
+app.use((req, res, next) => {
+  const nonce = crypto.randomBytes(32).toString('base64');
+  res.locals['nonce'] = nonce;
+  console.log(`created a nonce: ${nonce}`);
+  next();
+});
+app.use(
+  helmet({
+    frameguard: {
+      action: 'deny',
+    },
+    hidePoweredBy: true,
+    contentSecurityPolicy: {
+      directives: {
+      "script-src": [
+        "'self'",
+        // "'strict-dynamic'",
+        // @ts-ignore
+        (req: IncomingMessage, res: ServerResponse) => `'nonce-${res.locals['nonce']}'`,
+      ],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "object-src": ["'none'"],
+    },
+    useDefaults: true
+    }
+  })
+);
 
 /**
  * Serve static files from /browser with compression
@@ -52,38 +66,57 @@ app.use(
     serveStatic: {
       maxAge: '1y',
     },
-  }),
+  })
 );
 
 /**
- * Apply rate limiter to all other requests (Angular or API)
+ * Apply rate limiter to all other requests (Angular)
  */
+const dynamicLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: false,
+  legacyHeaders: false,
+});
 app.use(dynamicLimiter);
-
 
 /**
  *
  */
 
-app.use(compression({
-  threshold: 1024,
-  level: 6,
-  filter: (req, res) => {
-    console.log(res.getHeaders()['content-encoding']);
-    const ae = req.headers['accept-encoding'] || '';
-    return ae.includes('br') || ae.includes('gzip');
-  }
-}));
+app.use(
+  compression({
+    threshold: 1024,
+    level: 6,
+    filter: (req, res) => {
+      const ae = req.headers['accept-encoding'] || '';
+      return ae.includes('br') || ae.includes('gzip');
+    },
+  })
+);
 
 /**
  * Handle all other requests by rendering the Angular application.
  */
 app.use((req, res, next) => {
+  console.log("Angular rendering...");
   angularApp
-    .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
+    .handle(req, {
+      nonce: res.locals['nonce'],
+    } as RequestContext)
+    .then((response) => {
+      if(!response) {
+        next();
+        return;
+      }
+
+      console.log("Transforming node response")
+      transformIndexHtml(response, res, {
+        NONCE_VALUE: res.locals['nonce'],
+      });
+    })
+    .then(console.log)
     .catch(next);
 });
 

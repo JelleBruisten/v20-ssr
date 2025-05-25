@@ -27,7 +27,7 @@ export class AboutComponent {
   data = computed(() => {
     const params = this.routeParams();
     if(params) {
-      console.log(params);
+      console.log(`params`, params);
       return data.find((x) => x.name === params['name']);
     }
     return null;
