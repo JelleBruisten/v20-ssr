@@ -5,6 +5,10 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import compression from 'compression';
+import expressStaticGzip from 'express-static-gzip';
 import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -13,27 +17,63 @@ const app = express();
 const angularApp = new AngularNodeAppEngine();
 
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
+ * Rate limiter for dynamic (non-static) requests
+ * Applies to requests AFTER static assets are served
  */
+const dynamicLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: false,
+  legacyHeaders: false
+});
 
 /**
- * Serve static files from /browser
+ * Security Related Headers
+ */
+app.use(helmet({
+frameguard: {
+  action: 'deny'
+},
+hidePoweredBy: true,
+
+}))
+
+/**
+ * Serve static files from /browser with compression
  */
 app.use(
-  express.static(browserDistFolder, {
-    maxAge: '1y',
+  '/',
+  expressStaticGzip(browserDistFolder, {
+    enableBrotli: true,
+    orderPreference: ['br', 'gz'],
     index: false,
-    redirect: false,
+    // redirect: true,
+    serveStatic: {
+      maxAge: '1y',
+    },
   }),
 );
+
+/**
+ * Apply rate limiter to all other requests (Angular or API)
+ */
+app.use(dynamicLimiter);
+
+
+/**
+ *
+ */
+
+app.use(compression({
+  threshold: 1024,
+  level: 6,
+  filter: (req, res) => {
+    console.log(res.getHeaders()['content-encoding']);
+    const ae = req.headers['accept-encoding'] || '';
+    return ae.includes('br') || ae.includes('gzip');
+  }
+}));
 
 /**
  * Handle all other requests by rendering the Angular application.

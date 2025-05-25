@@ -1,0 +1,8 @@
+nav {
+  display: flex;
+  width: 100%;
+}
+
+nav > a {
+  margin-right: 10px;
+}

@@ -1,0 +1,11 @@
+<p>other works!</p>
+@if(isBrowser) {
+  @defer () {}
+  this will render on browser
+} @else {
+  this will render on server
+}
+<br/>
+@defer (hydrate on hover) {
+  <app-other-hydrate/>
+}
