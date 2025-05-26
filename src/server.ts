@@ -65,6 +65,7 @@ app.use(
     // redirect: true,
     serveStatic: {
       maxAge: '1y',
+      immutable: true,
     },
   })
 );
@@ -72,19 +73,17 @@ app.use(
 /**
  * Apply rate limiter to all other requests (Angular)
  */
-const dynamicLimiter = rateLimit({
+app.use(rateLimit({
   windowMs: 1 * 60 * 1000, // 15 minutes
   max: 20, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: false,
   legacyHeaders: false,
-});
-app.use(dynamicLimiter);
+}));
 
 /**
  *
  */
-
 app.use(
   compression({
     threshold: 1024,

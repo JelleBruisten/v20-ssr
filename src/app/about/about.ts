@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, PendingTasks } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 
@@ -21,7 +21,6 @@ const data = [
 })
 export class AboutComponent {
   route = inject(ActivatedRoute);
-
   routeParams = toSignal(this.route.params);
 
   data = computed(() => {
@@ -39,4 +38,5 @@ export class AboutComponent {
   renderMode: RenderMode.Server
 },
   `;
+
 }
