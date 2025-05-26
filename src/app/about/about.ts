@@ -31,5 +31,12 @@ export class AboutComponent {
       return data.find((x) => x.name === params['name']);
     }
     return null;
-  })
+  });
+
+  code = `
+{
+  path: '**',
+  renderMode: RenderMode.Server
+},
+  `;
 }

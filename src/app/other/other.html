@@ -1,11 +1,45 @@
 <p>other works!</p>
+
+<div>
+The following text is rendered differently in browser and server:<br/>
+<span style="font-style: italic;">
 @if(isBrowser) {
   @defer () {}
   this will render on browser
 } @else {
   this will render on server
 }
+</span>
+</div>
+
 <br/>
-@defer (hydrate on hover) {
-  <app-other-hydrate/>
-}
+<hr>
+<h2>Incremental Hydration</h2>
+<p>These are blue when hydrated and orange when they are thirsty</p>
+
+<div>
+  On timer ( 1500ms ): <br/>
+  @defer (hydrate on timer(1500ms)) {
+    <app-other-hydrate type="timer"/>
+  }
+</div>
+
+<div>
+  On hover: <br/>
+  @defer (hydrate on hover) {
+    <app-other-hydrate type="hover"/>
+  }
+</div>
+
+<div>
+  On interaction: <br/>
+  @defer (hydrate on interaction) {
+    <app-other-hydrate type="interaction"/>
+  }
+</div>
+
+<h2>Skipping Hydration:</h2>
+<div >
+  This skips hydration ( it will not look at the server rendered content and just do client side rendering without reuse..):
+  <app-other-hydrate ngSkipHydration type="skipped node"/>
+</div>

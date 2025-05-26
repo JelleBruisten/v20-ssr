@@ -7,5 +7,10 @@ import { Component } from '@angular/core';
   styleUrl: './home.css'
 })
 export class HomeComponent {
-
+  code = `
+{
+  path: 'home',
+  renderMode: RenderMode.Client
+},
+  `
 }

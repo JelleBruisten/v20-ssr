@@ -1,9 +1,18 @@
 <nav>
-  <a routerLink="/home">home</a>
-  <a routerLink="/about/foo">Foo</a>
-  <a routerLink="/about/bar">bar</a>
+  <div>Client Rendered<br/>
+    <a routerLink="/home">home</a>
+  </div>
 
-  <a routerLink="/other">other</a>
+  <div>
+    Server Rendered:<br/>
+    <a routerLink="/about/foo">Foo</a> -
+    <a routerLink="/about/bar">bar</a>
+  </div>
+
+  <div>
+    Hybrid and Conditional Rendering:<br/>
+    <a routerLink="/other">other</a>
+  </div>
 </nav>
 
 <router-outlet />

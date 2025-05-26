@@ -1,8 +1,14 @@
 nav {
   display: flex;
   width: 100%;
+  justify-content: space-around;
 }
 
-nav > a {
+nav > a, span > a {
   margin-right: 10px;
+}
+
+span {
+  display: inline-flex;
+  background-color: darkkhaki;
 }
