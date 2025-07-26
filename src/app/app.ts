@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, CSP_NONCE, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 
 @Component({

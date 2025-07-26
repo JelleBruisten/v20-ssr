@@ -12,8 +12,6 @@ import expressStaticGzip from 'express-static-gzip';
 import { join } from 'node:path';
 import crypto from 'crypto';
 import { RequestContext } from './request-context';
-import { Transform } from 'node:stream';
-import { transformIndexHtml } from './server/transform-index';
 import { IncomingMessage, ServerResponse } from 'node:http';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -24,14 +22,14 @@ const angularApp = new AngularNodeAppEngine();
 /**
  * Security Related Headers
  */
-// Generate a NONCE and correctly set it
 app.use((req, res, next) => {
+  // create nonce for the CSP
   const nonce = crypto.randomBytes(32).toString('base64');
+
+  // save nonce in the local variables for this request
   res.locals['nonce'] = nonce;
-  console.log(`created a nonce: ${nonce}`);
-  next();
-});
-app.use(
+
+  // setup helmet for security related protection/headers etc
   helmet({
     frameguard: {
       action: 'deny',
@@ -39,19 +37,18 @@ app.use(
     hidePoweredBy: true,
     contentSecurityPolicy: {
       directives: {
-      "script-src": [
-        "'self'",
-        // "'strict-dynamic'",
-        // @ts-ignore
-        (req: IncomingMessage, res: ServerResponse) => `'nonce-${res.locals['nonce']}'`,
-      ],
-      "style-src": ["'self'", "'unsafe-inline'"],
-      "object-src": ["'none'"],
+        'script-src': [
+          "'self'",
+          // "'strict-dynamic'",
+          () => `'nonce-${nonce}'`,
+        ],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'object-src': ["'none'"],
+      },
+      useDefaults: true,
     },
-    useDefaults: true
-    }
-  })
-);
+  })(req, res, next);
+});
 
 /**
  * Serve static files from /browser with compression
@@ -73,13 +70,15 @@ app.use(
 /**
  * Apply rate limiter to all other requests (Angular)
  */
-app.use(rateLimit({
-  windowMs: 1 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: false,
-  legacyHeaders: false,
-}));
+app.use(
+  rateLimit({
+    windowMs: 1 * 60 * 1000, // 15 minutes
+    max: 20, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: false,
+    legacyHeaders: false,
+  })
+);
 
 /**
  *
@@ -99,23 +98,32 @@ app.use(
  * Handle all other requests by rendering the Angular application.
  */
 app.use((req, res, next) => {
-  console.log("Angular rendering...");
+  console.log('Angular rendering...');
   angularApp
     .handle(req, {
       nonce: res.locals['nonce'],
     } as RequestContext)
-    .then((response) => {
-      if(!response) {
-        next();
-        return;
-      }
+    .then(async (response) => {
+      if (!response) return next();
 
-      console.log("Transforming node response")
-      transformIndexHtml(response, res, {
-        NONCE_VALUE: res.locals['nonce'],
+      // Clone the response (stream can be used only once)
+      const originalBody = await response.text();
+
+      // gather the nonce to be inserted
+      const nonce = res.locals['nonce'];
+
+      // replace every "{{nonce_value}}""
+      const replacedBody = originalBody.replace(/{{nonce_value}}/g, nonce);
+
+      // Create new Response with modified body
+      const modifiedResponse = new Response(replacedBody, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
       });
+
+      return writeResponseToNodeResponse(modifiedResponse, res);
     })
-    .then(console.log)
     .catch(next);
 });
 
